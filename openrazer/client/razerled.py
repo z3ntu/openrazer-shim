@@ -36,6 +36,9 @@ class _RazerLed:
         # Same as breath_single
         return self.breath_single(red, green, blue)
 
+    def reactive(self, red: int, green: int, blue: int, time: int) -> bool:
+        return self.led.setReactive((time,), (red, green, blue))
+
     def spectrum(self):
         return self.led.setSpectrum()
 
