@@ -1,3 +1,4 @@
+from .advancedfx import _AdvancedFx
 from .common import *
 
 
@@ -7,9 +8,11 @@ class _FxWrapper:
         self._leds = leds
         self._misc_wrapper = _MiscFxWrapper(device, leds)
 
+        self._advanced = _AdvancedFx(device)
+
     @property
     def advanced(self):
-        raise RuntimeError("not implemented yet")
+        return self._advanced
 
     @property
     def misc(self):

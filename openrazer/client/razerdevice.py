@@ -11,11 +11,13 @@ capability_to_features_map = {
 # active, breathing_triple, game_mode_led, led_matrix, macro_logic, ripple, starlight_dual, starlight_random,
 # starlight_single, starlight_triple
 capability_to_fx_map = {
+    "none": "off",
     "blinking": "blinking",
     "breath_dual": "breathing_dual",
     "breath_random": "breathing_random",
     "breath_single": "breathing",
     "brightness": "brightness",
+    "led_matrix": "custom_frame",
     "pulsate": "breathing",
     "reactive": "reactive",
     "spectrum": "spectrum",
@@ -23,16 +25,22 @@ capability_to_fx_map = {
     "wave": "wave"
 }
 
+# Intentionally missing / unimplemented capabilities
+missing_capabilities = [
+    "active", "breath_triple", "game_mode_led", "macro_logic", "ripple",
+    "starlight_dual", "starlight_random", "starlight_single", "starlight_triple"
+]
+
 
 class RazerDevice:
     def __init__(self, device_path):
-        self.device = bus.get(BUS_NAME, device_path)
+        self._device = bus.get(BUS_NAME, device_path)
         # TODO Maybe sometimes is logo led
         self.DEVICE_MAIN_LED = RLED_ID_BACKLIGHT
 
         self._leds = {}
         # Initialize real LEDs
-        for led_path in self.device.Leds:
+        for led_path in self._device.Leds:
             led = _RazerLed(self, led_path)
             self._leds[led._led_id] = led
 
@@ -42,6 +50,12 @@ class RazerDevice:
                 self._leds[LED_ID] = _DummyLed()
 
         self._fx_wrapper = _FxWrapper(self, self._leds)
+
+        # Values used by applications
+        self.macro = None
+        # FIXME VID/PID stub
+        self._vid = 0x0001
+        self._pid = 0x0001
 
     @property
     def brightness(self) -> float:
@@ -53,15 +67,15 @@ class RazerDevice:
 
     @property
     def dpi(self) -> tuple:
-        return self.device.getDPI()
+        return self._device.getDPI()
 
     @dpi.setter
     def dpi(self, value: tuple):
-        return self.device.setDPI(value)
+        return self._device.setDPI(value)
 
     @property
     def firmware_version(self) -> str:
-        return self.device.getFirmwareVersion()
+        return self._device.getFirmwareVersion()
 
     @property
     def fx(self):
@@ -69,19 +83,19 @@ class RazerDevice:
 
     @property
     def max_dpi(self) -> int:
-        return self.device.getMaxDPI()
+        return self._device.getMaxDPI()
 
     @property
     def name(self) -> str:
-        return self.device.Name
+        return self._device.Name
 
     @property
     def poll_rate(self) -> int:
-        return self.device.getPollRate()
+        return self._device.getPollRate()
 
     @poll_rate.setter
     def poll_rate(self, poll_rate: int):
-        return self.device.setPollRate(poll_rate)
+        return self._device.setPollRate(poll_rate)
 
     @property
     def razer_urls(self) -> dict:
@@ -90,21 +104,21 @@ class RazerDevice:
 
     @property
     def serial(self) -> str:
-        return self.device.getSerial()
+        return self._device.getSerial()
 
     @property
     def type(self) -> str:
-        return self.device.Type
+        return self._device.Type
 
     def has(self, capability: str) -> bool:
         val = self._has_internal(capability)
-        print("has(" + capability + ") resulted in " + str(val))
+        # print("has(" + capability + ") resulted in " + str(val))
         return val
 
     def _has_internal(self, capability: str) -> bool:
         # Check against Features
         if capability in capability_to_features_map:
-            return capability_to_features_map[capability] in self.device.SupportedFeatures
+            return capability_to_features_map[capability] in self._device.SupportedFeatures
 
         if capability == "lighting":
             return self._is_real_led(self.DEVICE_MAIN_LED)
@@ -113,7 +127,7 @@ class RazerDevice:
         if capability == "lighting_logo":
             return self._is_real_led(RLED_ID_LOGO)
         if capability == "lighting_backlight":
-            return self._is_real_led(RLED_ID_BACKLIGHT)
+            return self.DEVICE_MAIN_LED != RLED_ID_BACKLIGHT and self._is_real_led(RLED_ID_BACKLIGHT)
 
         # "brightness" is not prefixed with "lighting_"
         if capability == "brightness":
@@ -125,22 +139,30 @@ class RazerDevice:
             if not self._is_real_led(RLED_ID_SCROLL):
                 return False
             capability = capability.replace("lighting_scroll_", "")
-        if capability.startswith("lighting_logo"):
+        elif capability.startswith("lighting_logo"):
             if not self._is_real_led(RLED_ID_LOGO):
                 return False
             capability = capability.replace("lighting_logo_", "")
-        if capability.startswith("lighting_backlight_"):
-            if not self._is_real_led(RLED_ID_BACKLIGHT):
+        elif capability.startswith("lighting_backlight_"):
+            if self.DEVICE_MAIN_LED == RLED_ID_BACKLIGHT or not self._is_real_led(RLED_ID_BACKLIGHT):
                 return False
             capability = capability.replace("lighting_backlight_", "")
-        if capability.startswith("lighting_"):
+        elif capability.startswith("lighting_"):
             if not self._is_real_led(self.DEVICE_MAIN_LED):
+                return False
+            # No zero-argument pulsate in razer_test
+            if capability == "lighting_pulsate":
                 return False
             capability = capability.replace("lighting_", "")
 
         # Check against FX
         if capability in capability_to_fx_map:
-            return capability_to_fx_map[capability] in self.device.SupportedFx
+            return capability_to_fx_map[capability] in self._device.SupportedFx
+
+        if capability in missing_capabilities:
+            return False
+
+        print("WARNING: Unhandled capability: " + capability)
         return False
 
     def _is_real_led(self, led_id):
