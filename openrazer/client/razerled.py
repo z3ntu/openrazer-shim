@@ -7,6 +7,10 @@ class _RazerLed:
         self.led = bus.get(BUS_NAME, led_path)
 
     @property
+    def _led_id(self) -> int:
+        return self.led.LedId[0]
+
+    @property
     def brightness(self) -> float:
         return self.led.getBrightness() / 255 * 100
 
@@ -14,9 +18,8 @@ class _RazerLed:
     def brightness(self, brightness: float):
         self.led.setBrightness(brightness / 100 * 255)
 
-    @property
-    def _led_id(self) -> int:
-        return self.led.LedId[0]
+    def has(self, capability: str) -> bool:
+        return self._device.has("lighting_" + capability)
 
     def blinking(self, red: int, green: int, blue: int) -> bool:
         return self.led.setBlinking((red, green, blue))
@@ -48,9 +51,6 @@ class _RazerLed:
 
     def wave(self, direction: int) -> bool:
         return self.led.setWave((direction,))
-
-    def has(self, capability: str) -> bool:
-        return self._device.has("lighting_" + capability)
 
 
 class _DummyLed:
