@@ -1,5 +1,6 @@
 from .common import *
-from .razerled import _FxWrapper, _RazerLed, _DummyLed
+from .fxwrapper import _FxWrapper
+from .razerled import _RazerLed, _DummyLed
 
 capability_to_features_map = {
     "dpi": "dpi",
@@ -26,27 +27,29 @@ capability_to_fx_map = {
 class RazerDevice:
     def __init__(self, device_path):
         self.device = bus.get(BUS_NAME, device_path)
+        # TODO Maybe sometimes is logo led
+        self.DEVICE_MAIN_LED = RLED_ID_BACKLIGHT
 
         self._leds = {}
         # Initialize real LEDs
         for led_path in self.device.Leds:
-            led = _RazerLed(led_path)
-            self._leds[led.led_id] = led
+            led = _RazerLed(self, led_path)
+            self._leds[led._led_id] = led
 
         # Initialize all other LEDs with _DummyLed
-        for LED_ID in [RLED_ID_MAIN, RLED_ID_SCROLL, RLED_ID_LOGO, RLED_ID_BACKLIGHT]:
+        for LED_ID in [RLED_ID_SCROLL, RLED_ID_LOGO, RLED_ID_BACKLIGHT]:
             if LED_ID not in self._leds:
                 self._leds[LED_ID] = _DummyLed()
 
-        self._fx_wrapper = _FxWrapper(self._leds)
+        self._fx_wrapper = _FxWrapper(self, self._leds)
 
     @property
     def brightness(self) -> float:
-        return self._leds[RLED_ID_BACKLIGHT].brightness
+        return self._leds[self.DEVICE_MAIN_LED].brightness
 
     @brightness.setter
     def brightness(self, brightness: float):
-        self._leds[RLED_ID_BACKLIGHT].brightness = brightness
+        self._leds[self.DEVICE_MAIN_LED].brightness = brightness
 
     @property
     def dpi(self) -> tuple:
@@ -104,7 +107,7 @@ class RazerDevice:
             return capability_to_features_map[capability] in self.device.SupportedFeatures
 
         if capability == "lighting":
-            return self._is_real_led(RLED_ID_MAIN)
+            return self._is_real_led(self.DEVICE_MAIN_LED)
         if capability == "lighting_scroll":
             return self._is_real_led(RLED_ID_SCROLL)
         if capability == "lighting_logo":
@@ -114,7 +117,7 @@ class RazerDevice:
 
         # "brightness" is not prefixed with "lighting_"
         if capability == "brightness":
-            if not self._is_real_led(RLED_ID_MAIN):
+            if not self._is_real_led(self.DEVICE_MAIN_LED):
                 return False
 
         # Remove FX prefixes
@@ -131,7 +134,7 @@ class RazerDevice:
                 return False
             capability = capability.replace("lighting_backlight_", "")
         if capability.startswith("lighting_"):
-            if not self._is_real_led(RLED_ID_MAIN):
+            if not self._is_real_led(self.DEVICE_MAIN_LED):
                 return False
             capability = capability.replace("lighting_", "")
 

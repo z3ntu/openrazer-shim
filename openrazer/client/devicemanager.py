@@ -23,3 +23,13 @@ class DeviceManager:
     @property
     def devices(self):
         return self._devices
+
+    @property
+    def sync_effects(self):
+        # TODO Stub
+        return True
+
+    @sync_effects.setter
+    def sync_effects(self, sync):
+        # TODO Stub
+        pass

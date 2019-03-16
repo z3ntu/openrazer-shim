@@ -2,7 +2,8 @@ from .common import *
 
 
 class _RazerLed:
-    def __init__(self, led_path):
+    def __init__(self, device, led_path):
+        self._device = device
         self.led = bus.get(BUS_NAME, led_path)
 
     @property
@@ -14,7 +15,7 @@ class _RazerLed:
         self.led.setBrightness(brightness / 100 * 255)
 
     @property
-    def led_id(self) -> int:
+    def _led_id(self) -> int:
         return self.led.LedId[0]
 
     def blinking(self, red: int, green: int, blue: int) -> bool:
@@ -48,6 +49,9 @@ class _RazerLed:
     def wave(self, direction: int) -> bool:
         return self.led.setWave((direction,))
 
+    def has(self, capability: str) -> bool:
+        return self._device.has("lighting_" + capability)
+
 
 class _DummyLed:
     @property
@@ -59,33 +63,3 @@ class _DummyLed:
     def brightness(self, brightness: float):
         print("WARNING: DummyLed not doing anything")
         pass
-
-
-class _FxWrapper(_RazerLed):
-    def __init__(self, leds: dict):
-        self._misc_wrapper = _MiscFxWrapper(leds)
-
-    @property
-    def advanced(self):
-        raise RuntimeError("not implemented yet")
-
-    @property
-    def misc(self):
-        return self._misc_wrapper
-
-
-class _MiscFxWrapper:
-    def __init__(self, leds: dict):
-        self._leds = leds
-
-    @property
-    def logo(self):
-        return self._leds[RLED_ID_LOGO]
-
-    @property
-    def scroll_wheel(self):
-        return self._leds[RLED_ID_SCROLL]
-
-    @property
-    def backlight(self):
-        return self._leds[RLED_ID_BACKLIGHT]
